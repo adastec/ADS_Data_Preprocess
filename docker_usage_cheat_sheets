@@ -1,0 +1,5 @@
+In the terminal (inside ~/ads_project), run:
+docker build -t ads_data_extractor_env .
+
+Run the Docker Container with Your Project Mounted:
+docker run -it --rm -v ~/ads_project:/workspace ads_data_extractor_env
