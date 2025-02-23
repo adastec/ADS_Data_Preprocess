@@ -1,0 +1,29 @@
+rostopic_map:
+  position:
+    position_x:
+      description: "AV's localization x coordinate"
+      unit: "m"
+      topics:
+        - /bayesian_fusion_pose.pose.pose.position.x
+        - /current_pose.pose.position.x
+        - /lidar_localizer/predicted_pose.pose.pose.position.x
+    position_y:
+      description: "AV's localization y coordinate"
+      unit: "m"
+      topics:
+        - /bayesian_fusion_pose.pose.pose.position.y
+        - /current_pose.pose.position.y
+        - /lidar_localizer/predicted_pose.pose.pose.position.y
+    position_z:
+      description: "AV's localization z coordinate"
+      unit: "m"
+      topics:
+        - /bayesian_fusion_pose.pose.pose.position.z
+        - /current_pose.pose.position.z
+        - /lidar_localizer/predicted_pose.pose.pose.position.z
+  speed:
+    speed_kph:
+      description: "AV's speed"
+      unit: "km/h"
+      topics:
+        - /vehicle_gate_interface/driving_status.engine.speed
