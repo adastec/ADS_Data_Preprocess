@@ -16,3 +16,6 @@ WORKDIR /workspace
 
 # Default command
 CMD ["bash"]
+
+SHELL ["/bin/bash", "-c"]
+RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
