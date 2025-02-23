@@ -1,29 +1,74 @@
 rostopic_map:
   position:
-    position_x:
-      description: "AV's localization x coordinate"
+    local_position_x:
+      description: "AV's localization on local PCD map in x coordinate"
       unit: "m"
+      type: "status"
       topics:
         - /bayesian_fusion_pose.pose.pose.position.x
         - /current_pose.pose.position.x
         - /lidar_localizer/predicted_pose.pose.pose.position.x
-    position_y:
-      description: "AV's localization y coordinate"
+        - /gnss_pose.pose.pose.position.x
+    local_position_y:
+      description: "AV's localization on local PCD map in y coordinate"
       unit: "m"
+      type: "status"
       topics:
         - /bayesian_fusion_pose.pose.pose.position.y
         - /current_pose.pose.position.y
         - /lidar_localizer/predicted_pose.pose.pose.position.y
-    position_z:
-      description: "AV's localization z coordinate"
+        - /gnss_pose.pose.pose.position.y
+    local_position_z:
+      description: "AV's localization on local PCD map in z coordinate"
       unit: "m"
+      type: "status"
       topics:
         - /bayesian_fusion_pose.pose.pose.position.z
         - /current_pose.pose.position.z
         - /lidar_localizer/predicted_pose.pose.pose.position.z
-  speed:
-    speed_kph:
-      description: "AV's speed"
+        - /gnss_pose.pose.pose.position.z
+        
+  vehicle_speed:
+    vehicle_speed_kph:
+      description: "AV's speed in km/h"
       unit: "km/h"
+      type: "status"
       topics:
         - /vehicle_gate_interface/driving_status.engine.speed
+        - /bus_status_read.vehicle_speed
+    vehicle_speed_mps:
+      description: "AV's speed in m/s"
+      unit: "m/s"
+      type: "status"
+      topics:
+        - /control/atak_vehicle_cmd_converter/debug_values.data[1]
+        - /control/trajectory_follower/velocity_controller/debug_values.data[1]
+        - /bayesian_fusion_status.vehicle_speed_mps
+
+  acceleration:
+    acceleration_x:
+      description: "AV's acceleration in x direction"
+      unit: "m/s^2"
+      type: "status"
+      topics:
+        - /gps/imu.linear_acceleration.x
+    acceleration_y:
+      description: "AV's acceleration in y direction"
+      unit: "m/s^2"
+      type: "status"
+      topics:
+        - /gps/imu.linear_acceleration.y
+    acceleration_z:
+      description: "AV's acceleration in z direction"
+      unit: "m/s^2"
+      type: "status"
+      topics:
+        - /gps/imu.linear_acceleration.z
+    acceleration_command_x:
+      description: "AV's acceleration command in x direction"
+      unit: "m/s^2"
+      type: "command"
+      topics:
+        - /control/vehicle_cmd.control.acceleration
+        - /control/trajectory_follower/control_cmd.control.acceleration
+    

@@ -15,7 +15,8 @@ RUN pip3 install --upgrade pip && \
 WORKDIR /workspace
 
 # Default command
-CMD ["bash"]
+CMD ["/bin/bash", "-c", "source /opt/ros/noetic/setup.bash && exec bash"]
+
 
 SHELL ["/bin/bash", "-c"]
-RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
+RUN echo "source /opt/ros/noetic/setup.bash" >> /root/.bashrc
