@@ -1,7 +1,9 @@
+import sys, os
 import rosbag
 import pandas as pd
 import pprint
-from rostopic_handler import load_rostopic_map, generate_extraction_instructions
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from data_extraction.rostopic_handler import load_rostopic_map, generate_extraction_instructions
 
 def load_rosbag(file_path):
     """
@@ -77,7 +79,7 @@ if __name__ == "__main__":
 
     # Load rostopic mapping from YAML.
     try:
-        topic_map = load_rostopic_map("ADS_Data_Extractor/config/rostopic_mapping.yaml")
+        topic_map = load_rostopic_map("/workspace/ADS_Data_Extractor/config/rostopic_mapping.yaml")
     except Exception as e:
         print(f"Failed to load YAML mapping: {e}")
         bag.close()

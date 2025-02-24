@@ -1,37 +1,73 @@
 import os
+import logging
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-def package_data(synchronized_data):
-    """
-    Package the synchronized data.
-    
-    In this example, we assume that synchronized_data is a dictionary
-    mapping topic names to Pandas DataFrames. If further transformation
-    is needed (e.g., merging topics into one DataFrame), it can be done here.
-    
-    Currently, it simply returns the data as-is.
-    """
-    return synchronized_data
+# Configure logging.
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def save_to_storage(packaged_data, output_path):
+def package_data(merged_df):
     """
-    Save the packaged data to storage as Parquet files.
+    Package the merged DataFrame for final storage.
     
-    If packaged_data is a dictionary (each topic has its own DataFrame),
-    this function will create a directory at output_path (if it does not exist)
-    and write each DataFrame to a separate Parquet file.
+    This function is designed to accept a single merged DataFrame that contains 
+    the unified timeline, 'Duration', 'epoch', and one column per topic.
     
-    For example, if a topic is "/topic1", it will be saved as "topic1.parquet".
+    Any further transformation (if needed) can be implemented here.
+    
+    Returns:
+        merged_df (pandas.DataFrame): The packaged data ready for storage.
+    """
+    # Further transformations or metadata additions can be done here.
+    return merged_df
+
+def save_to_storage(final_df, output_path, filename="merged_data.parquet"):
+    """
+    Save the final merged DataFrame to storage as a single Parquet file.
+    
+    This function creates the output directory if it does not exist and writes
+    the final merged DataFrame to a Parquet file.
+    
+    Parameters:
+        final_df (pandas.DataFrame): The merged DataFrame containing synchronized data.
+        output_path (str): Directory where the final Parquet file will be stored.
+        filename (str): The file name of the final Parquet file (default "merged_data.parquet").
     """
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
+        logging.info(f"Created output directory: {output_path}")
+    else:
+        logging.info(f"Using existing output directory: {output_path}")
     
-    for topic, df in packaged_data.items():
-        # Create a safe filename by stripping leading slashes and replacing any others with underscores.
-        safe_topic = topic.strip("/").replace("/", "_")
-        file_path = os.path.join(output_path, f"{safe_topic}.parquet")
-        # Convert the DataFrame to an Apache Arrow Table and write it to a Parquet file.
-        table = pa.Table.from_pandas(df)
+    file_path = os.path.join(output_path, filename)
+    try:
+        # Convert the merged DataFrame to an Apache Arrow Table.
+        table = pa.Table.from_pandas(final_df)
+        # Write the table to a Parquet file.
         pq.write_table(table, file_path)
-        print(f"Saved packaged data for topic '{topic}' at {file_path}")
+        logging.info(f"Saved merged data into Parquet at: {file_path}")
+    except Exception as e:
+        logging.error(f"Failed to save merged data to Parquet: {e}")
+
+# Example usage:
+if __name__ == "__main__":
+    import pandas as pd
+    import numpy as np
+
+    # For demonstration: create a sample merged DataFrame.
+    # In practice, this DataFrame would be produced by the synchronizer/validator modules.
+    bag_start = pd.to_datetime("2025-02-14 14:37:18")
+    bag_end = pd.to_datetime("2025-02-14 14:37:28")
+    unified_index = pd.date_range(start=bag_start, end=bag_end, freq="10ms")
+    
+    # Dummy columns: Duration, epoch, Topic_A, and Topic_B.
+    base_df = pd.DataFrame(index=unified_index)
+    base_df["Duration"] = (unified_index - bag_start).total_seconds()
+    base_df["epoch"] = unified_index.astype(np.int64) / 1e9
+    base_df["Topic_A"] = np.sin(np.linspace(0, 2*np.pi, len(unified_index)))
+    base_df["Topic_B"] = np.cos(np.linspace(0, 2*np.pi, len(unified_index)))
+    
+    # Package and save the merged DataFrame.
+    merged_df = package_data(base_df)
+    output_directory = "/workspace/ADS_Data_Extractor/output_parquet"
+    save_to_storage(merged_df, output_directory)

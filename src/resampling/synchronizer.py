@@ -29,12 +29,15 @@ def create_final_timeseries(bag_start, bag_end, synchronized_topics, frequency="
 
     # Reindex and rename each topic's DataFrame, then store for concatenation.
     topic_dfs = {}
+    # Reindex and rename each topic's DataFrame, then store for concatenation.
+    topic_dfs = {}
     for logical_name, df_topic in synchronized_topics.items():
         if "value" not in df_topic.columns:
             print(f"Warning: Topic '{logical_name}' data missing 'value' column.")
             continue
-        # Reindex to the unified timeline (NaNs for missing timestamps).
-        df_topic_reindexed = df_topic.reindex(unified_index)
+        # Reindex using 'nearest' method with a tolerance of 5ms.
+        tolerance = pd.Timedelta("5ms")
+        df_topic_reindexed = df_topic.reindex(unified_index, method='nearest', tolerance=tolerance)
         # Rename the column to the logical name.
         df_topic_reindexed = df_topic_reindexed.rename(columns={"value": logical_name})
         topic_dfs[logical_name] = df_topic_reindexed[logical_name]
