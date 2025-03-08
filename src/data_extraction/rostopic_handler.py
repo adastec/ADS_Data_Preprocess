@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import os
 import yaml
 import rosbag
@@ -15,42 +16,59 @@ def load_rostopic_map(yaml_path="ADS_Data_Extractor/config/rostopic_mapping.yaml
         raise ValueError("YAML file is empty or invalid: " + yaml_path)
     return mapping.get("rostopic_map", {})
 
-def get_bag_topics(bag):
+def get_bag_topics(bag_or_messages):
     """
-    Retrieves the list of topics available in the given rosbag.
-    Returns a set of topic names.
+    If a rosbag object is provided, use get_type_and_topic_info().
+    Otherwise, if a list of messages is provided, extract unique topic names.
     """
-    info = bag.get_type_and_topic_info()
-    topics = set(info.topics.keys())
+    if isinstance(bag_or_messages, list):
+        # bag_or_messages is a list of tuples (topic_name, msg, t)
+        topics = {topic_name for topic_name, _, _ in bag_or_messages}
+    else:
+        info = bag_or_messages.get_type_and_topic_info()
+        topics = set(info.topics.keys())
     print("Available topics in bag:", topics)
     return topics
 
-def candidate_matches(candidate, available_topic):
+def candidate_matches(candidate_base, available_topic):
     """
-    Returns True if the candidate topic (from the YAML mapping) matches the available topic.
-    If the candidate contains additional fields (e.g. '.pose.position.x'), it checks if the base topic
-    (everything before the first '.') matches the available topic.
+    Returns True if the candidate base topic matches the available topic.
     """
-    # Exact match
-    if candidate == available_topic:
-        return True
-    # If candidate has extra fields, compare base topic
-    if '.' in candidate:
-        base_candidate = candidate.split('.')[0]
-        if base_candidate == available_topic:
-            return True
-    return False
+    return candidate_base == available_topic
+
+def parse_candidate(candidate):
+    """
+    Splits a candidate string into base topic and field.
+    For example, if candidate is '/bayesian_fusion_pose.pose.pose.position.x',
+    it returns ('/bayesian_fusion_pose', 'pose.pose.position.x').
+    If no extra field is present, returns (candidate, None).
+    """
+    pattern = re.compile(r"(^[^\.]+)(.*)")
+    m = pattern.match(candidate)
+    if m:
+        base_topic = m.group(1)
+        field = m.group(2)
+        # Remove leading dot if it exists
+        if field and field.startswith('.'):
+            field = field[1:]
+        if field == "":
+            field = None
+        return base_topic, field
+    return candidate, None
 
 def get_matching_topic(candidate_list, available_topics):
     """
     Given a list of candidate topics from the YAML mapping and the set of available topics from the bag,
-    returns the first candidate that matches (either exactly or based on the base topic).
+    returns a tuple (selected_topic, field) where:
+      - selected_topic is the matching base topic from the bag,
+      - field is the appended field string (or None if not provided).
     """
     for candidate in candidate_list:
+        candidate_base, field = parse_candidate(candidate)
         for topic in available_topics:
-            if candidate_matches(candidate, topic):
-                return topic
-    return None
+            if candidate_matches(candidate_base, topic):
+                return topic, field
+    return None, None
 
 def select_available_topics(bag, topic_map):
     """
@@ -63,9 +81,10 @@ def select_available_topics(bag, topic_map):
         available[category] = {}
         for info_key, info_details in items.items():
             candidate_topics = info_details.get("topics", [])
-            selected_topic = get_matching_topic(candidate_topics, bag_topics)
+            selected_topic, field = get_matching_topic(candidate_topics, bag_topics)
             available[category][info_key] = {
                 "selected_topic": selected_topic,
+                "field": field,
                 "description": info_details.get("description", ""),
                 "unit": info_details.get("unit", ""),
                 "type": info_details.get("type", "")
@@ -86,9 +105,11 @@ def generate_extraction_instructions(bag, topic_map):
         for info_key, info_details in items.items():
             candidates = info_details.get("topics", [])
             selected_topic = available_topics_map[category][info_key]["selected_topic"]
+            field = available_topics_map[category][info_key].get("field")
             extraction_list.append({
                 "logical_name": f"{category}.{info_key}",
                 "selected_topic": selected_topic,
+                "field": field,
                 "candidates": candidates,
                 "description": info_details.get("description", ""),
                 "unit": info_details.get("unit", ""),

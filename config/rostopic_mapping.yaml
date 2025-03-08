@@ -42,6 +42,7 @@ rostopic_map:
       type: "status"
       topics:
         - /control/atak_vehicle_cmd_converter/debug_values.data[1]
+        - /control/lightning_vehicle_cmd_converter/debug_values.data[1]
         - /control/trajectory_follower/velocity_controller/debug_values.data[1]
         - /bayesian_fusion_status.vehicle_speed_mps
 

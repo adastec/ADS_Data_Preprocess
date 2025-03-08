@@ -2,6 +2,7 @@ import sys, os
 import rosbag
 import pandas as pd
 import pprint
+import re
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_extraction.rostopic_handler import load_rostopic_map, generate_extraction_instructions
 
@@ -27,34 +28,70 @@ def load_rosbag(file_path):
 
 def get_field_value(msg, field_path):
     """
-    Extracts a nested field from msg given a dot-separated field_path.
-    For example, if field_path is 'control.acceleration', it will try:
-       value = msg.control.acceleration
-    Returns None if any attribute is missing.
+    Extracts a (potentially nested) field from msg given a dot-separated field_path.
+    Supports indexing if the field spec has a bracket notation.
+    For example: 'control.debug_values.data[11]' will:
+         1. Get msg.control
+         2. Get the debug_values attribute
+         3. Get the data attribute and then its 12th element (index 11)
+    Returns None if any attribute or index is missing.
     """
     fields = field_path.split('.')
     value = msg
+    # Regular expression to match something like "data[11]"
+    index_regex = re.compile(r"(\w+)\[(\d+)\]")
     for f in fields:
-        if not hasattr(value, f):
-            return None
-        value = getattr(value, f)
+        match = index_regex.match(f)
+        if match:
+            # f has the form: attribute[index]
+            attr = match.group(1)
+            idx = int(match.group(2))
+            if not hasattr(value, attr):
+                return None
+            value = getattr(value, attr)
+            # Now, value should be indexable
+            try:
+                value = value[idx]
+            except (IndexError, TypeError):
+                return None
+        else:
+            if not hasattr(value, f):
+                return None
+            value = getattr(value, f)
     return value
 
 def extract_topic_data(bag, topic, field_path=None):
     """
     Iterates over messages in the given topic and collects the data.
     Each entry is stored as a tuple (timestamp, extracted_value).
-    If field_path is provided, extracts that field from the message,
-    otherwise saves the whole message.
+    If field_path is provided, extracts that field from the message;
+    otherwise, saves the whole message.
+    
+    The timestamp is taken from the message stamp if available:
+      - First, it checks for msg.header.stamp.
+      - If not present, it checks for msg.stamp.
+      - Otherwise, it falls back to the rosbag's timestamp.
     """
     data = []
     try:
         for topic_name, msg, t in bag.read_messages(topics=[topic]):
+            # Use the message's own stamp (if available) rather than the bag timestamp.
+            if hasattr(msg, 'header') and hasattr(msg.header, 'stamp'):
+                msg_time = msg.header.stamp.to_sec()
+            elif hasattr(msg, 'stamp'):
+                try:
+                    msg_time = msg.stamp.to_sec()
+                except AttributeError:
+                    # If stamp doesn't have to_sec(), try converting directly.
+                    msg_time = float(msg.stamp)
+            else:
+                msg_time = t.to_sec()
+            
             if field_path:
                 extracted = get_field_value(msg, field_path)
             else:
                 extracted = msg
-            data.append((t.to_sec(), extracted))
+            data.append((msg_time, extracted))
         print(f"Extracted {len(data)} entries from topic '{topic}'")
     except Exception as e:
         print(f"Error reading messages for topic {topic}: {e}")
@@ -62,10 +99,17 @@ def extract_topic_data(bag, topic, field_path=None):
 
 def convert_to_dataframe(topic_data):
     """
-    Optional: Convert extracted topic data into a Pandas DataFrame.
-    Customize the conversion based on the message structure.
+    Converts a list of (timestamp, message) tuples into a Pandas DataFrame.
+    Assumes the message is a numeric value.
+    Renames the data column to "value".
     """
+    import pandas as pd
     df = pd.DataFrame(topic_data, columns=["timestamp", "msg"])
+    # Rename 'msg' column to 'value' for consistent usage.
+    df = df.rename(columns={"msg": "value"})
+    # Convert the timestamp (assumed to be in seconds) to a datetime index.
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
+    df.set_index("timestamp", inplace=True)
     return df
 
 if __name__ == "__main__":
@@ -121,7 +165,7 @@ if __name__ == "__main__":
     bag.close()
 
     # Report the number of entries and optionally display a DataFrame head.
-    output_folder = "/workspace/ADS_Data_Extractor/output_df"
+    output_folder = "/workspace/ADS_Data_Extractor/output_parquet"
     for logical_name, entries in extracted_data.items():
         print(f"\nLogical name '{logical_name}' has {len(entries)} entries.")
         if entries:
